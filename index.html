@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Remove unwanted line breaks from copied PDF text in your browser.">
+    <title>Linebreak Removed Copier</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="workspace" aria-labelledby="app-title">
+        <header class="toolbar">
+          <div>
+            <p class="eyebrow">PDF text cleaner</p>
+            <h1 id="app-title">Linebreak Removed Copier</h1>
+          </div>
+          <div class="status" aria-live="polite" data-status>Ready</div>
+        </header>
+
+        <div class="controls" aria-label="Cleaning options">
+          <label class="toggle">
+            <input type="checkbox" data-option="hyphen" checked>
+            <span>Repair split words</span>
+          </label>
+          <label class="toggle">
+            <input type="checkbox" data-option="paragraphs" checked>
+            <span>Keep paragraphs</span>
+          </label>
+          <label class="toggle">
+            <input type="checkbox" data-option="spaces" checked>
+            <span>Collapse spaces</span>
+          </label>
+        </div>
+
+        <div class="editor-grid">
+          <section class="editor-panel">
+            <div class="panel-heading">
+              <label for="sourceText">Original text</label>
+              <button class="icon-button" type="button" data-action="clear" aria-label="Clear original text" title="Clear">
+                <span aria-hidden="true">×</span>
+              </button>
+            </div>
+            <textarea id="sourceText" spellcheck="false" placeholder="Paste copied PDF text here" data-source></textarea>
+          </section>
+
+          <section class="editor-panel">
+            <div class="panel-heading">
+              <label for="resultText">Cleaned text</label>
+              <button class="copy-button" type="button" data-action="copy">
+                Copy
+              </button>
+            </div>
+            <textarea id="resultText" spellcheck="false" readonly placeholder="Cleaned text appears here" data-result></textarea>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <script src="script.js" defer></script>
+  </body>
+</html>

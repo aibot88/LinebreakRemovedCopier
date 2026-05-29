@@ -1,28 +1,16 @@
+# Linebreak Removed Copier
 
-# 🎸 Linebreak Removed Copier
-<br>
+A pure static web app for cleaning copied PDF text by removing unwanted line breaks.
 
-##  📝 Introduction
+## Use
 
-###  This software will help you to copy PDF texts without linebreaks. 
-<br>
+Open the GitHub Pages site, paste text into the left panel, and copy the cleaned result from the right panel.
 
-### Here's how to use:
-### 🌠 1. Open the program.
+## Development
 
-### 🌠 2. Copy PDF texts using 'Ctrl (command) + C C'
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;_Hold down 'Ctrl' (or 'command' for Mac) and press 'C' twice._
+This project has no build step and no runtime dependencies.
 
-### 🌠 3. Paste the text anywhere without linebreaks!
-<br>
+- `index.html` contains the page structure.
+- `styles.css` contains the responsive layout and visual styling.
+- `script.js` contains all browser-side text cleaning logic.
 
-
-### 💻 You can also download an executable file.
-File name: [LinebreakRemovedCopier.zip](https://github.com/kwonova/LinebreakRemovedCopier/raw/main/LinebreakRemovedCopier.zip) (for Windows)
-<br>
-File name: [LinebreakRemovedCopierForMac.zip](https://github.com/kwonova/LinebreakRemovedCopier/raw/main/LinebreakRemovedCopierForMac.zip) (for Mac)
-<br>
-<br>
-#### Contact: ✉️ kwonova@yonsei.ac.kr
-
-[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://buymeacoffee.com/su.kwon.ignis)
