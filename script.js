@@ -68,6 +68,46 @@ function getLanguageLabel(language) {
 async function translateText(text, requestId) {
   const sourceLanguage = detectLanguage(text);
   const targetLanguage = getTargetLanguage(sourceLanguage);
+
+  setStatus(
+    `Translating ${getLanguageLabel(sourceLanguage)} to ${getLanguageLabel(targetLanguage)}`,
+    "is-active",
+  );
+
+  const translated = await requestTranslation(text, sourceLanguage, targetLanguage);
+
+  if (requestId === translationRequest) {
+    translationText.value = translated;
+    setStatus("Translated", "is-active");
+  }
+}
+
+async function requestTranslation(text, sourceLanguage, targetLanguage) {
+  try {
+    return await requestChromeTranslation(text, sourceLanguage, targetLanguage);
+  } catch {
+    return requestSingleTranslation(text, sourceLanguage, targetLanguage);
+  }
+}
+
+async function requestChromeTranslation(text, sourceLanguage, targetLanguage) {
+  const url = new URL("https://clients5.google.com/translate_a/t");
+
+  url.searchParams.set("client", "dict-chrome-ex");
+  url.searchParams.set("sl", sourceLanguage);
+  url.searchParams.set("tl", targetLanguage);
+  url.searchParams.set("q", text);
+
+  const data = await fetchJson(url);
+
+  if (!Array.isArray(data) || !data[0]) {
+    throw new Error("Empty translation");
+  }
+
+  return data.join("");
+}
+
+async function requestSingleTranslation(text, sourceLanguage, targetLanguage) {
   const url = new URL("https://translate.googleapis.com/translate_a/single");
 
   url.searchParams.set("client", "gtx");
@@ -76,24 +116,24 @@ async function translateText(text, requestId) {
   url.searchParams.set("dt", "t");
   url.searchParams.set("q", text);
 
-  setStatus(
-    `Translating ${getLanguageLabel(sourceLanguage)} to ${getLanguageLabel(targetLanguage)}`,
-    "is-active",
-  );
+  const data = await fetchJson(url);
+  const translated = data?.[0]?.map((part) => part[0]).join("");
 
-  const response = await fetch(url.toString());
+  if (!translated) {
+    throw new Error("Empty translation");
+  }
+
+  return translated;
+}
+
+async function fetchJson(url) {
+  const response = await fetch(url.toString(), { cache: "no-store" });
 
   if (!response.ok) {
-    throw new Error("Translation request failed");
+    throw new Error(`HTTP ${response.status}`);
   }
 
-  const data = await response.json();
-  const translated = data[0].map((part) => part[0]).join("");
-
-  if (requestId === translationRequest) {
-    translationText.value = translated;
-    setStatus("Translated", "is-active");
-  }
+  return response.json();
 }
 
 function scheduleTranslation(text) {
@@ -110,10 +150,10 @@ function scheduleTranslation(text) {
   translationTimer = setTimeout(async () => {
     try {
       await translateText(text, requestId);
-    } catch {
+    } catch (error) {
       if (requestId === translationRequest) {
         translationText.value = "";
-        setStatus("Translation failed", "is-error");
+        setStatus(error.message || "Translation failed", "is-error");
       }
     }
   }, 450);
@@ -139,13 +179,33 @@ async function copyText(textarea) {
     return;
   }
 
+  if (navigator.clipboard?.writeText && window.isSecureContext) {
+    try {
+      await navigator.clipboard.writeText(textarea.value);
+      setStatus("Copied", "is-active");
+      return;
+    } catch {
+      copyWithSelection(textarea);
+      return;
+    }
+  }
+
+  copyWithSelection(textarea);
+}
+
+function copyWithSelection(textarea) {
+  textarea.removeAttribute("readonly");
+  textarea.focus();
+  textarea.select();
+  textarea.setSelectionRange(0, textarea.value.length);
+
   try {
-    await navigator.clipboard.writeText(textarea.value);
-    setStatus("Copied", "is-active");
+    const copied = document.execCommand("copy");
+    setStatus(copied ? "Copied" : "Press Cmd+C", copied ? "is-active" : "is-error");
   } catch {
-    textarea.select();
-    document.execCommand("copy");
-    setStatus("Copied", "is-active");
+    setStatus("Press Cmd+C", "is-error");
+  } finally {
+    textarea.setAttribute("readonly", "");
   }
 }
 
