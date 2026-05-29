@@ -139,7 +139,7 @@ h1 {
   flex: 1;
   min-height: 440px;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
 }
 
@@ -223,6 +223,17 @@ textarea:focus {
   color: var(--ink);
 }
 
+@media (max-width: 1050px) {
+  .editor-grid {
+    grid-template-columns: 1fr;
+    min-height: 980px;
+  }
+
+  textarea {
+    min-height: 280px;
+  }
+}
+
 @media (max-width: 800px) {
   .app-shell {
     width: min(100% - 20px, 720px);
@@ -243,13 +254,7 @@ textarea:focus {
     font-size: 2rem;
   }
 
-  .editor-grid {
-    grid-template-columns: 1fr;
-    min-height: 720px;
-  }
-
   textarea {
     min-height: 300px;
   }
 }
-

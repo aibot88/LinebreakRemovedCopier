@@ -47,11 +47,21 @@
           <section class="editor-panel">
             <div class="panel-heading">
               <label for="resultText">Cleaned text</label>
-              <button class="copy-button" type="button" data-action="copy">
+              <button class="copy-button" type="button" data-action="copy-result" aria-label="Copy cleaned text">
                 Copy
               </button>
             </div>
             <textarea id="resultText" spellcheck="false" readonly placeholder="Cleaned text appears here" data-result></textarea>
+          </section>
+
+          <section class="editor-panel">
+            <div class="panel-heading">
+              <label for="translationText">Translation</label>
+              <button class="copy-button" type="button" data-action="copy-translation" aria-label="Copy translated text">
+                Copy
+              </button>
+            </div>
+            <textarea id="translationText" spellcheck="false" readonly placeholder="Translation appears here" data-translation></textarea>
           </section>
         </div>
       </section>
