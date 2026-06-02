@@ -13,6 +13,9 @@ const options = {
   spaces: document.querySelector('[data-option="spaces"]'),
 };
 
+const MAX_TRANSLATE_CHARS = 1800;
+const TRANSLATION_TIMEOUT_MS = 9000;
+
 let translationTimer;
 let translationRequest = 0;
 
@@ -68,26 +71,93 @@ function getLanguageLabel(language) {
 async function translateText(text, requestId) {
   const sourceLanguage = detectLanguage(text);
   const targetLanguage = getTargetLanguage(sourceLanguage);
+  const chunks = splitTranslationChunks(text);
+  const translatedChunks = [];
 
   setStatus(
     `Translating ${getLanguageLabel(sourceLanguage)} to ${getLanguageLabel(targetLanguage)}`,
     "is-active",
   );
 
-  const translated = await requestTranslation(text, sourceLanguage, targetLanguage);
+  for (let index = 0; index < chunks.length; index += 1) {
+    if (requestId !== translationRequest) {
+      return;
+    }
+
+    if (chunks.length > 1) {
+      setStatus(`Translating ${index + 1}/${chunks.length}`, "is-active");
+    }
+
+    translatedChunks.push(
+      await requestTranslation(chunks[index], sourceLanguage, targetLanguage),
+    );
+  }
 
   if (requestId === translationRequest) {
-    translationText.value = translated;
+    translationText.value = translatedChunks.join("\n\n");
     setStatus("Translated", "is-active");
   }
 }
 
 async function requestTranslation(text, sourceLanguage, targetLanguage) {
-  try {
-    return await requestChromeTranslation(text, sourceLanguage, targetLanguage);
-  } catch {
-    return requestSingleTranslation(text, sourceLanguage, targetLanguage);
+  const providers = [
+    requestGoogleApiStructuredTranslation,
+    requestGoogleApiLegacyTranslation,
+    requestChromeTranslation,
+  ];
+  const errors = [];
+
+  for (const provider of providers) {
+    try {
+      return await provider(text, sourceLanguage, targetLanguage);
+    } catch (error) {
+      errors.push(error.message);
+    }
   }
+
+  throw new Error(errors.find(Boolean) || "Translation failed");
+}
+
+async function requestGoogleApiStructuredTranslation(text, sourceLanguage, targetLanguage) {
+  const url = new URL("https://translate.googleapis.com/translate_a/single");
+
+  url.searchParams.set("client", "gtx");
+  url.searchParams.set("sl", sourceLanguage);
+  url.searchParams.set("tl", targetLanguage);
+  url.searchParams.set("hl", "zh-HK");
+  url.searchParams.set("dt", "t");
+  url.searchParams.set("dj", "1");
+  url.searchParams.set("ie", "UTF-8");
+  url.searchParams.set("oe", "UTF-8");
+  url.searchParams.set("q", text);
+
+  const data = await fetchJson(url);
+  const translated = data?.sentences?.map((part) => part.trans).join("");
+
+  if (!translated) {
+    throw new Error("Empty translation");
+  }
+
+  return translated;
+}
+
+async function requestGoogleApiLegacyTranslation(text, sourceLanguage, targetLanguage) {
+  const url = new URL("https://translate.googleapis.com/translate_a/single");
+
+  url.searchParams.set("client", "gtx");
+  url.searchParams.set("sl", sourceLanguage);
+  url.searchParams.set("tl", targetLanguage);
+  url.searchParams.set("dt", "t");
+  url.searchParams.set("q", text);
+
+  const data = await fetchJson(url);
+  const translated = data?.[0]?.map((part) => part[0]).join("");
+
+  if (!translated) {
+    throw new Error("Empty translation");
+  }
+
+  return translated;
 }
 
 async function requestChromeTranslation(text, sourceLanguage, targetLanguage) {
@@ -107,33 +177,98 @@ async function requestChromeTranslation(text, sourceLanguage, targetLanguage) {
   return data.join("");
 }
 
-async function requestSingleTranslation(text, sourceLanguage, targetLanguage) {
-  const url = new URL("https://translate.googleapis.com/translate_a/single");
+async function fetchJson(url) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), TRANSLATION_TIMEOUT_MS);
 
-  url.searchParams.set("client", "gtx");
-  url.searchParams.set("sl", sourceLanguage);
-  url.searchParams.set("tl", targetLanguage);
-  url.searchParams.set("dt", "t");
-  url.searchParams.set("q", text);
+  try {
+    const response = await fetch(url.toString(), {
+      cache: "no-store",
+      signal: controller.signal,
+    });
 
-  const data = await fetchJson(url);
-  const translated = data?.[0]?.map((part) => part[0]).join("");
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
 
-  if (!translated) {
-    throw new Error("Empty translation");
+    return response.json();
+  } finally {
+    clearTimeout(timeout);
   }
-
-  return translated;
 }
 
-async function fetchJson(url) {
-  const response = await fetch(url.toString(), { cache: "no-store" });
+function splitTranslationChunks(text) {
+  const paragraphs = text.split(/\n{2,}/);
+  const chunks = [];
+  let current = "";
 
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}`);
+  for (const paragraph of paragraphs) {
+    const parts = splitLongParagraph(paragraph);
+
+    for (const part of parts) {
+      const separator = current ? "\n\n" : "";
+      const next = `${current}${separator}${part}`;
+
+      if (next.length > MAX_TRANSLATE_CHARS && current) {
+        chunks.push(current);
+        current = part;
+      } else {
+        current = next;
+      }
+    }
   }
 
-  return response.json();
+  if (current) {
+    chunks.push(current);
+  }
+
+  return chunks;
+}
+
+function splitLongParagraph(paragraph) {
+  if (paragraph.length <= MAX_TRANSLATE_CHARS) {
+    return [paragraph];
+  }
+
+  const sentences = paragraph
+    .match(/[^.!?。！？]+[.!?。！？]?\s*/g)
+    ?.map((sentence) => sentence.trim())
+    .filter(Boolean) || [paragraph];
+  const chunks = [];
+  let current = "";
+
+  for (const sentence of sentences) {
+    if (sentence.length > MAX_TRANSLATE_CHARS) {
+      chunks.push(...splitByLength(sentence));
+      current = "";
+      continue;
+    }
+
+    const next = current ? `${current} ${sentence}` : sentence;
+
+    if (next.length > MAX_TRANSLATE_CHARS && current) {
+      chunks.push(current);
+      current = sentence;
+    } else {
+      current = next;
+    }
+  }
+
+  if (current) {
+    chunks.push(current);
+  }
+
+  return chunks;
+}
+
+function splitByLength(text) {
+  const chunks = [];
+
+  for (let index = 0; index < text.length; index += MAX_TRANSLATE_CHARS) {
+    chunks.push(text.slice(index, index + MAX_TRANSLATE_CHARS));
+  }
+
+  return chunks;
 }
 
 function scheduleTranslation(text) {
