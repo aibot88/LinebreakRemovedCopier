@@ -15,6 +15,31 @@ const options = {
 
 const MAX_TRANSLATE_CHARS = 1800;
 const TRANSLATION_TIMEOUT_MS = 9000;
+const LATEX_ESCAPE_MAP = {
+  "\\": "\\textbackslash{}",
+  "&": "\\&",
+  "%": "\\%",
+  "$": "\\$",
+  "#": "\\#",
+  "_": "\\_",
+  "{": "\\{",
+  "}": "\\}",
+  "~": "\\textasciitilde{}",
+  "^": "\\textasciicircum{}",
+};
+const DEFAULT_LATEX_ESCAPE_CHARS = new Set(["%", "&", "_", "#"]);
+const PROTECTED_LATEX_SEGMENTS = [
+  { pattern: /%[^\n]*/g, isValid: isUnescapedMatch },
+  { pattern: /\\begin\{(verbatim|lstlisting|minted|Verbatim)\}[\s\S]*?\\end\{\1\}/g },
+  { pattern: /\\verb\*?(.).*?\1/gs },
+  { pattern: /\$\$[\s\S]*?\$\$/g },
+  { pattern: /\$(?:\\.|[^$\\])*\$/g, isValid: isUnescapedMatch },
+  { pattern: /\\\([\s\S]*?\\\)/g },
+  { pattern: /\\\[[\s\S]*?\\\]/g },
+  { pattern: /\\begin\{(equation|align|gather|multline|eqnarray)\*?\}[\s\S]*?\\end\{\1\*?\}/g },
+  { pattern: /\\[%&_#${}\\~^]/g },
+  { pattern: /\\[a-zA-Z]+/g },
+];
 
 let translationTimer;
 let translationRequest = 0;
@@ -45,14 +70,89 @@ function cleanText(text) {
   }
 
   if (!options.paragraphs.checked) {
-    return normalizeParagraph(normalized);
+    return escapeLatex(normalizeParagraph(normalized));
   }
 
-  return normalized
+  const cleaned = normalized
     .split(/\n{2,}/)
     .map(normalizeParagraph)
     .filter(Boolean)
     .join("\n\n");
+
+  return escapeLatex(cleaned);
+}
+
+function escapeLatex(text, escapeChars = DEFAULT_LATEX_ESCAPE_CHARS) {
+  const activeMap = getLatexEscapeMap(escapeChars);
+  const activeChars = Object.keys(activeMap);
+
+  if (!activeChars.length) {
+    return text;
+  }
+
+  const charPattern = new RegExp(`[${escapeRegExp(activeChars.join(""))}]`, "g");
+  let result = "";
+  let lastEnd = 0;
+  let segment = findNextProtectedLatexSegment(text, lastEnd);
+
+  while (segment) {
+    result += escapePlainLatexText(text.slice(lastEnd, segment.index), charPattern, activeMap);
+    result += segment.value;
+    lastEnd = segment.index + segment.value.length;
+    segment = findNextProtectedLatexSegment(text, lastEnd);
+  }
+
+  return result + escapePlainLatexText(text.slice(lastEnd), charPattern, activeMap);
+}
+
+function getLatexEscapeMap(escapeChars) {
+  const activeMap = {};
+
+  for (const char of escapeChars) {
+    if (Object.prototype.hasOwnProperty.call(LATEX_ESCAPE_MAP, char)) {
+      activeMap[char] = LATEX_ESCAPE_MAP[char];
+    }
+  }
+
+  return activeMap;
+}
+
+function findNextProtectedLatexSegment(text, fromIndex) {
+  let nextSegment = null;
+
+  for (const segment of PROTECTED_LATEX_SEGMENTS) {
+    const match = findValidLatexSegment(text, fromIndex, segment);
+
+    if (match && (!nextSegment || match.index < nextSegment.index)) {
+      nextSegment = match;
+    }
+  }
+
+  return nextSegment ? { index: nextSegment.index, value: nextSegment[0] } : null;
+}
+
+function findValidLatexSegment(text, fromIndex, segment) {
+  segment.pattern.lastIndex = fromIndex;
+
+  for (let match = segment.pattern.exec(text); match; match = segment.pattern.exec(text)) {
+    if (!segment.isValid || segment.isValid(text, match)) {
+      return match;
+    }
+  }
+
+  return null;
+}
+
+function isUnescapedMatch(text, match) {
+  return match.index === 0 || text[match.index - 1] !== "\\";
+}
+
+function escapePlainLatexText(text, charPattern, activeMap) {
+  return text.replace(charPattern, (char) => activeMap[char]);
+}
+
+function escapeRegExp(text) {
+  return text.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&");
 }
 
 function detectLanguage(text) {

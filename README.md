@@ -1,6 +1,6 @@
 # Linebreak Removed Copier
 
-A pure static web app for cleaning copied PDF text by removing unwanted line breaks and translating between Chinese and English.
+A pure static web app for cleaning copied PDF text by removing unwanted line breaks, escaping common LaTeX content characters, and translating between Chinese and English.
 
 ## Use
 
