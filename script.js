@@ -31,7 +31,7 @@ const DEFAULT_LATEX_ESCAPE_CHARS = new Set(["%", "&", "_", "#"]);
 const PROTECTED_LATEX_SEGMENTS = [
   { pattern: /%[^\n]*/g, isValid: isUnescapedMatch },
   { pattern: /\\begin\{(verbatim|lstlisting|minted|Verbatim)\}[\s\S]*?\\end\{\1\}/g },
-  { pattern: /\\verb\*?(.).*?\1/gs },
+  { pattern: /\\verb\*?(.)(?:[\s\S]*?)\1/g },
   { pattern: /\$\$[\s\S]*?\$\$/g },
   { pattern: /\$(?:\\.|[^$\\])*\$/g, isValid: isUnescapedMatch },
   { pattern: /\\\([\s\S]*?\\\)/g },
